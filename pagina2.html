@@ -1,0 +1,638 @@
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CETEC Festival - Sistema de Ingressos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .ticket-card {
+            transition: all 0.2s ease;
+        }
+        .ticket-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+    </style>
+
+    <!-- Conexão com Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "SUA_API_KEY",
+        authDomain: "SEU_DOMINIO.firebaseapp.com",
+        databaseURL: "https://SEU_DOMINIO.firebaseio.com",
+        projectId: "ID_DO_PROJETO",
+        storageBucket: "SEU_BUCKET",
+        messagingSenderId: "ID_REMETENTE",
+        appId: "SEU_APP_ID"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+    </script>
+</head>
+<body class="bg-gradient-to-br from-[#E6F0F7] to-white text-gray-800 min-h-screen">
+    <header class="bg-cover bg-center text-white shadow-md" style="background-image: url('topo-CETEC-festival-2025.jpg');">
+        <div class="bg-[#0f3d57]/80">
+            <div class="container mx-auto px-6 py-16">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h1 class="text-4xl font-bold tracking-tight">CETEC Festival</h1>
+                        <p class="text-blue-100 text-lg">Sistema de Gerenciamento de Ingressos</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 mt-6 md:mt-0">
+                        <button id="tab-tickets" class="tab-btn px-5 py-2 bg-white text-[#0077C8] rounded-full font-semibold shadow-sm active">
+                            <i class="fas fa-ticket-alt mr-2"></i>Ingressos
+                        </button>
+                        <button id="tab-sales" class="tab-btn px-5 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 text-white rounded-full font-semibold">
+                            <i class="fas fa-cart-plus mr-2"></i>Comprar
+                        </button>
+                        <button id="tab-purchases" class="tab-btn px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 text-white rounded-full font-semibold">
+                            <i class="fas fa-list mr-2"></i>Consultar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="container mx-auto px-4 py-10">
+        <!-- Seção de Cadastro/Listagem de Ingressos -->
+        <div id="tickets-content" class="tab-content active">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold text-gray-800">Gerenciamento de Ingressos</h2>
+                <button id="new-ticket-btn" class="bg-[#0077C8] hover:bg-[#0077C8] text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Novo Ingresso
+                </button>
+            </div>
+
+            <div id="ticket-form-container" class="hidden bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 class="text-xl font-semibold mb-4">Cadastrar Novo Ingresso</h3>
+                <form id="ticket-form" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <input type="hidden" id="ticket-id">
+                    <div>
+                        <label for="ticket-name" class="block text-sm font-medium text-gray-700 mb-1">Nome do Ingresso</label>
+                        <input type="text" id="ticket-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                    </div>
+                    <div>
+                        <label for="ticket-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
+                        <input type="number" id="ticket-quantity" min="1" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                    </div>
+                    <div>
+                        <label for="ticket-price" class="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+                        <input type="number" id="ticket-price" min="0" step="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                    </div>
+                    <div class="md:col-span-3 flex justify-end space-x-3">
+                        <button type="button" id="cancel-ticket-btn" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 bg-[#0077C8] text-white rounded-md hover:bg-[#0077C8]">Salvar</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="tickets-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Ingressos serão carregados aqui dinamicamente -->
+                <div class="bg-white p-6 rounded-xl shadow-md ticket-card border-t-4 border-[#0077C8]">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800">Pista</h3>
+                            <span class="text-green-600 font-medium">R$ 150,00</span>
+                        </div>
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Disponíveis: 200</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <button class="edit-btn px-3 py-1 bg-[#0077C8] text-white rounded-md text-sm" data-id="1">
+                            <i class="fas fa-edit mr-1"></i>Editar
+                        </button>
+                        <button class="delete-btn px-3 py-1 bg-red-500 text-white rounded-md text-sm" data-id="1">
+                            <i class="fas fa-trash mr-1"></i>Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção de Compra de Ingressos -->
+        <div id="sales-content" class="tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-8">Comprar Ingresso</h2>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <form id="sale-form">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label for="buyer-name" class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                            <input type="text" id="buyer-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                        </div>
+                        <div>
+                            <label for="buyer-email" class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                            <input type="email" id="buyer-email" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                        </div>
+                        <div>
+                            <label for="ticket-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Ingresso</label>
+                            <select id="ticket-type" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                                <option value="">Selecione...</option>
+                                <option value="1">Pista - R$ 150,00</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="ticket-quantity-buy" class="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
+                            <input type="number" id="ticket-quantity-buy" min="1" value="1" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                        </div>
+                    </div>
+                    
+                    <div id="sale-summary" class="bg-gray-50 p-4 rounded-lg mb-6 hidden">
+                        <h4 class="font-medium text-gray-800 mb-2">Resumo da Compra</h4>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-600">Ingresso:</span>
+                            <span id="summary-type" class="font-medium">Pista</span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-600">Quantidade:</span>
+                            <span id="summary-quantity" class="font-medium">1</span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-600">Valor Unitário:</span>
+                            <span id="summary-unit-price" class="font-medium">R$ 150,00</span>
+                        </div>
+                        <div class="flex justify-between border-t border-gray-200 mt-3 pt-2">
+                            <span class="text-gray-600">Total:</span>
+                            <span id="summary-total" class="font-bold text-lg text-[#0077C8]">R$ 150,00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-center">
+                        <button type="submit" class="px-6 py-3 bg-[#0077C8] text-white rounded-lg hover:[#0077C8] font-medium pulse">
+                            <i class="fas fa-check-circle mr-2"></i>Confirmar Compra
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Seção de Consulta de Compras -->
+        <div id="purchases-content" class="tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-8">Consulta de Compras</h2>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <div class="mb-4">
+                    <label for="filter-ticket-type" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Tipo de Ingresso</label>
+                    <select id="filter-ticket-type" class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0077C8]">
+                        <option value="">Todos os ingressos</option>
+                        <option value="1">Pista</option>
+                    </select>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Ingresso</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchases-list" class="bg-white divide-y divide-gray-200">
+                            <!-- Compras serão carregadas aqui dinamicamente -->
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">João Silva</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">joao@example.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Pista</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">R$ 300,00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Confirmação -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800">Confirmação</h3>
+                <button id="modal-close-btn" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-message" class="mb-6">
+                <!-- Mensagem será inserida aqui -->
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-[#0077C8] text-white rounded-md hover:bg-[#0077C8]">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado da aplicação
+        let appState = {
+            tickets: [
+                { id: 1, name: "Pista", quantity: 200, price: 150.00 }
+            ],
+            sales: [
+                { id: 1, buyerName: "João Silva", buyerEmail: "joao@example.com", ticketId: 1, ticketName: "Pista", quantity: 2, totalPrice: 300.00, date: "2023-06-15" }
+            ]
+        };
+
+        // Elementos DOM
+        const DOM = {
+            tabs: {
+                ticketsBtn: document.getElementById('tab-tickets'),
+                salesBtn: document.getElementById('tab-sales'),
+                purchasesBtn: document.getElementById('tab-purchases'),
+                ticketsContent: document.getElementById('tickets-content'),
+                salesContent: document.getElementById('sales-content'),
+                purchasesContent: document.getElementById('purchases-content')
+            },
+            ticket: {
+                formContainer: document.getElementById('ticket-form-container'),
+                form: document.getElementById('ticket-form'),
+                list: document.getElementById('tickets-list'),
+                newBtn: document.getElementById('new-ticket-btn'),
+                cancelBtn: document.getElementById('cancel-ticket-btn'),
+                idInput: document.getElementById('ticket-id'),
+                nameInput: document.getElementById('ticket-name'),
+                quantityInput: document.getElementById('ticket-quantity'),
+                priceInput: document.getElementById('ticket-price')
+            },
+            sale: {
+                form: document.getElementById('sale-form'),
+                nameInput: document.getElementById('buyer-name'),
+                emailInput: document.getElementById('buyer-email'),
+                typeSelect: document.getElementById('ticket-type'),
+                quantityInput: document.getElementById('ticket-quantity-buy'),
+                summary: document.getElementById('sale-summary'),
+                summaryType: document.getElementById('summary-type'),
+                summaryQuantity: document.getElementById('summary-quantity'),
+                summaryUnitPrice: document.getElementById('summary-unit-price'),
+                summaryTotal: document.getElementById('summary-total')
+            },
+            purchase: {
+                filterSelect: document.getElementById('filter-ticket-type'),
+                list: document.getElementById('purchases-list')
+            },
+            modal: {
+                container: document.getElementById('confirmation-modal'),
+                title: document.getElementById('modal-title'),
+                message: document.getElementById('modal-message'),
+                closeBtn: document.getElementById('modal-close-btn'),
+                cancelBtn: document.getElementById('modal-cancel-btn'),
+                confirmBtn: document.getElementById('modal-confirm-btn')
+            }
+        };
+
+        // Utilitários
+        const utils = {
+            formatCurrency: (value) => {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+            },
+            showModal: (title, message, confirmCallback = null) => {
+                DOM.modal.title.textContent = title;
+                DOM.modal.message.innerHTML = message;
+                DOM.modal.container.classList.remove('hidden');
+                
+                if (confirmCallback) {
+                    const handler = () => {
+                        confirmCallback();
+                        DOM.modal.confirmBtn.removeEventListener('click', handler);
+                    };
+                    DOM.modal.confirmBtn.addEventListener('click', handler);
+                }
+            },
+            hideModal: () => {
+                DOM.modal.container.classList.add('hidden');
+            }
+        };
+
+        // Funções principais
+        const app = {
+            init: () => {
+                // Configura eventos
+                app.setupEventListeners();
+                
+                // Carrega dados iniciais
+                app.loadTickets();
+                app.loadSales();
+                
+                // Configura selects dinâmicos
+                app.updateTicketSelects();
+            },
+            setupEventListeners: () => {
+                // Abas
+                DOM.tabs.ticketsBtn.addEventListener('click', () => app.showTab('tickets'));
+                DOM.tabs.salesBtn.addEventListener('click', () => app.showTab('sales'));
+                DOM.tabs.purchasesBtn.addEventListener('click', () => app.showTab('purchases'));
+                
+                // Ingressos
+                DOM.ticket.newBtn.addEventListener('click', app.showNewTicketForm);
+                DOM.ticket.cancelBtn.addEventListener('click', app.cancelTicketForm);
+                DOM.ticket.form.addEventListener('submit', app.saveTicket);
+                
+                // Vendas
+                DOM.sale.form.addEventListener('submit', app.saveSale);
+                DOM.sale.typeSelect.addEventListener('change', app.updateSaleSummary);
+                DOM.sale.quantityInput.addEventListener('change', app.updateSaleSummary);
+                
+                // Compras
+                DOM.purchase.filterSelect.addEventListener('change', app.filterPurchases);
+                
+                // Modal
+                DOM.modal.closeBtn.addEventListener('click', utils.hideModal);
+                DOM.modal.cancelBtn.addEventListener('click', utils.hideModal);
+            },
+            showTab: (tabName) => {
+                // Remove classe active de todos os botões e conteúdos
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.classList.add('bg-opacity-10', 'hover:bg-opacity-20');
+                });
+                
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Adiciona classe active ao botão e conteúdo selecionado
+                const tabBtn = document.getElementById(`tab-${tabName}`);
+                const tabContent = document.getElementById(`${tabName}-content`);
+                
+                tabBtn.classList.add('active', 'bg-white');
+                tabBtn.classList.remove('bg-opacity-10', 'hover:bg-opacity-20');
+                if (tabName !== 'tickets') {
+                    tabBtn.classList.remove('bg-white');
+                    tabBtn.classList.add('text-white');
+                } else {
+                    tabBtn.classList.add('text-[#0077C8]');
+                }
+                
+                tabContent.classList.add('active');
+            },
+            // Gerenciamento de Ingressos
+            loadTickets: () => {
+                DOM.ticket.list.innerHTML = '';
+                
+                appState.tickets.forEach(ticket => {
+                    const ticketElement = document.createElement('div');
+                    ticketElement.className = 'bg-white p-6 rounded-xl shadow-md ticket-card border-t-4 border-[#0077C8]';
+                    ticketElement.innerHTML = `
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">${ticket.name}</h3>
+                                <span class="text-[#0077C8] font-medium">${utils.formatCurrency(ticket.price)}</span>
+                            </div>
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Disponíveis: ${ticket.quantity}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <button class="edit-btn px-3 py-1 bg-[#0077C8] text-white rounded-md text-sm" data-id="${ticket.id}">
+                                <i class="fas fa-edit mr-1"></i>Editar
+                            </button>
+                            <button class="delete-btn px-3 py-1 bg-red-500 text-white rounded-md text-sm" data-id="${ticket.id}">
+                                <i class="fas fa-trash mr-1"></i>Excluir
+                            </button>
+                        </div>
+                    `;
+                    
+                    DOM.ticket.list.appendChild(ticketElement);
+                });
+                
+                // Adiciona eventos aos botões dinâmicos
+                document.querySelectorAll('.edit-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => app.editTicket(parseInt(e.target.closest('button').dataset.id)));
+                });
+                
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => app.confirmDeleteTicket(parseInt(e.target.closest('button').dataset.id)));
+                });
+            },
+            showNewTicketForm: () => {
+                DOM.ticket.form.reset();
+                DOM.ticket.idInput.value = '';
+                DOM.ticket.formContainer.classList.remove('hidden');
+                DOM.ticket.nameInput.focus();
+            },
+            cancelTicketForm: () => {
+                DOM.ticket.formContainer.classList.add('hidden');
+            },
+            editTicket: (id) => {
+                const ticket = appState.tickets.find(t => t.id === id);
+                if (ticket) {
+                    DOM.ticket.idInput.value = ticket.id;
+                    DOM.ticket.nameInput.value = ticket.name;
+                    DOM.ticket.quantityInput.value = ticket.quantity;
+                    DOM.ticket.priceInput.value = ticket.price;
+                    DOM.ticket.formContainer.classList.remove('hidden');
+                    DOM.ticket.nameInput.focus();
+                }
+            },
+            saveTicket: (e) => {
+                e.preventDefault();
+                
+                const id = DOM.ticket.idInput.value ? parseInt(DOM.ticket.idInput.value) : null;
+                const name = DOM.ticket.nameInput.value.trim();
+                const quantity = parseInt(DOM.ticket.quantityInput.value);
+                const price = parseFloat(DOM.ticket.priceInput.value);
+                
+                if (id) {
+                    // Edição
+                    const index = appState.tickets.findIndex(t => t.id === id);
+                    if (index !== -1) {
+                        appState.tickets[index] = { id, name, quantity, price };
+                    }
+                } else {
+                    // Novo
+                    const newId = appState.tickets.length > 0 ? Math.max(...appState.tickets.map(t => t.id)) + 1 : 1;
+                    appState.tickets.push({ id: newId, name, quantity, price });
+                }
+                
+                // Atualiza a lista e reseta o formulário
+                app.loadTickets();
+                DOM.ticket.formContainer.classList.add('hidden');
+                app.updateTicketSelects();
+                
+                // Feedback
+                utils.showModal('Sucesso', `Ingresso <strong>${name}</strong> foi ${id ? 'atualizado' : 'cadastrado'} com sucesso!`);
+            },
+            confirmDeleteTicket: (id) => {
+                const ticket = appState.tickets.find(t => t.id === id);
+                if (!ticket) return;
+                
+                utils.showModal('Confirmar Exclusão', `Tem certeza que deseja excluir o ingresso <strong>${ticket.name}</strong>?`, () => {
+                    appState.tickets = appState.tickets.filter(t => t.id !== id);
+                    app.loadTickets();
+                    app.updateTicketSelects();
+                    utils.hideModal();
+                    
+                    // Remove vendas associadas a esse ingresso
+                    appState.sales = appState.sales.filter(s => s.ticketId !== id);
+                    app.loadSales();
+                });
+            },
+            updateTicketSelects: () => {
+                // Atualiza select na aba de vendas
+                DOM.sale.typeSelect.innerHTML = '<option value="">Selecione...</option>';
+                appState.tickets.forEach(ticket => {
+                    const option = document.createElement('option');
+                    option.value = ticket.id;
+                    option.textContent = `${ticket.name} - ${utils.formatCurrency(ticket.price)}`;
+                    DOM.sale.typeSelect.appendChild(option);
+                });
+                
+                // Atualiza select na aba de consulta
+                DOM.purchase.filterSelect.innerHTML = '<option value="">Todos os ingressos</option>';
+                appState.tickets.forEach(ticket => {
+                    const option = document.createElement('option');
+                    option.value = ticket.id;
+                    option.textContent = ticket.name;
+                    DOM.purchase.filterSelect.appendChild(option);
+                });
+            },
+            // Gerenciamento de Vendas
+            updateSaleSummary: () => {
+                const ticketId = parseInt(DOM.sale.typeSelect.value);
+                const quantity = parseInt(DOM.sale.quantityInput.value) || 0;
+                
+                const ticket = appState.tickets.find(t => t.id === ticketId);
+                if (ticket) {
+                    DOM.sale.summary.classList.remove('hidden');
+                    DOM.sale.summaryType.textContent = ticket.name;
+                    DOM.sale.summaryQuantity.textContent = quantity;
+                    DOM.sale.summaryUnitPrice.textContent = utils.formatCurrency(ticket.price);
+                    DOM.sale.summaryTotal.textContent = utils.formatCurrency(ticket.price * quantity);
+                } else {
+                    DOM.sale.summary.classList.add('hidden');
+                }
+            },
+            saveSale: (e) => {
+                e.preventDefault();
+                
+                const name = DOM.sale.nameInput.value.trim();
+                const email = DOM.sale.emailInput.value.trim();
+                const ticketId = parseInt(DOM.sale.typeSelect.value);
+                const quantity = parseInt(DOM.sale.quantityInput.value);
+                
+                // Validações
+                if (!ticketId) {
+                    utils.showModal('Atenção', 'Selecione um tipo de ingresso.');
+                    return;
+                }
+                
+                const ticket = appState.tickets.find(t => t.id === ticketId);
+                if (!ticket) {
+                    utils.showModal('Erro', 'Ingresso selecionado não encontrado.');
+                    return;
+                }
+                
+                if (quantity < 1) {
+                    utils.showModal('Atenção', 'A quantidade deve ser pelo menos 1.');
+                    return;
+                }
+                
+                if (quantity > ticket.quantity) {
+                    utils.showModal('Atenção', `Quantidade indisponível. Apenas ${ticket.quantity} ingressos disponíveis.`);
+                    return;
+                }
+                
+                // Processa venda
+                const totalPrice = ticket.price * quantity;
+                const newId = appState.sales.length > 0 ? Math.max(...appState.sales.map(s => s.id)) + 1 : 1;
+                
+                appState.sales.push({
+                    id: newId,
+                    buyerName: name,
+                    buyerEmail: email,
+                    ticketId,
+                    ticketName: ticket.name,
+                    quantity,
+                    totalPrice,
+                    date: new Date().toISOString().split('T')[0]
+                });
+                
+                // Atualiza estoque
+                ticket.quantity -= quantity;
+                
+                // Atualiza a interface
+                app.loadSales();
+                app.loadTickets();
+                app.updateTicketSelects();
+                DOM.sale.form.reset();
+                DOM.sale.summary.classList.add('hidden');
+                
+                // Feedback
+                utils.showModal('Sucesso', `Compra realizada com sucesso!<br><br>
+                    <strong>Ingresso:</strong> ${ticket.name} (${quantity}x ${utils.formatCurrency(ticket.price)})<br>
+                    <strong>Total:</strong> ${utils.formatCurrency(totalPrice)}`);
+            },
+            // Gerenciamento de Compras
+            loadSales: () => {
+                DOM.purchase.list.innerHTML = '';
+                
+                appState.sales.forEach(sale => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${sale.buyerName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.buyerEmail}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.ticketName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.quantity}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${utils.formatCurrency(sale.totalPrice)}</td>
+                    `;
+                    DOM.purchase.list.appendChild(row);
+                });
+            },
+            filterPurchases: () => {
+                const ticketId = DOM.purchase.filterSelect.value;
+                
+                if (!ticketId) {
+                    app.loadSales();
+                    return;
+                }
+                
+                const filtered = appState.sales.filter(sale => sale.ticketId == ticketId);
+                
+                DOM.purchase.list.innerHTML = '';
+                filtered.forEach(sale => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${sale.buyerName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.buyerEmail}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.ticketName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sale.quantity}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${utils.formatCurrency(sale.totalPrice)}</td>
+                    `;
+                    DOM.purchase.list.appendChild(row);
+                });
+            }
+        };
+
+        // Inicia a aplicação
+        document.addEventListener('DOMContentLoaded', app.init);
+        document.getElementById("modal-confirm-btn").addEventListener("click", function() {
+    // Fecha o modal
+    document.getElementById("confirmation-modal").classList.add("hidden");
+
+    // Ativa a aba "Consultar"
+    document.getElementById("tab-purchases").click();
+});
+    </script>
+    </main>
+</body>
+</html>
